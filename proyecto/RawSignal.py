@@ -72,7 +72,7 @@ class RawSignal:
 
         Parámetros:
         picks : list de str o str, opcional
-            canal a excluir.
+            Canal o lista de canales a extraer. Si es None, se devuelven todos los canales.
         start : float, opcional
             Tiempo inicial del segmento en segundos. Valor por defecto: 0.
         stop : float, opcional
@@ -459,6 +459,9 @@ class RawSignal:
         if isinstance(key, str):
             picks = [key]
             s = slice(None)
+        elif all(isinstance(pick, str) for pick in key):
+            picks = key
+            s = slice(None)
         elif isinstance(key, tuple) and len(key) == 2:
             picks, s = key
             if isinstance(picks, str):
@@ -491,7 +494,7 @@ class RawSignal:
 
         return datos, tiempo
 
-    def plot(self,start=0,scalings=40):
+    def plot(self,start=0,scalings=40,color="crimson"):
         """
         Grafica la señal fisiológica utilizando la herramienta de visualización de MNE.
 
@@ -511,8 +514,10 @@ class RawSignal:
         Notas:
         - Requiere "mne".
         """
+        if self.info.ch_names is None:
+            self.info.ch_names=["Canal no definido"]
         objeto_raw=mne.io.RawArray(self.data,mne.create_info(self.info.ch_names,self.info.sfreq))
-        return objeto_raw.plot(start=start,scalings=scalings)
+        return objeto_raw.plot(start=start,scalings=scalings,color=color)
     
     def set_anotaciones(self, anotaciones_nuevas):
         """
@@ -542,4 +547,63 @@ class RawSignal:
         # Asignar si todo está bien
         self.anotaciones = anotaciones_nuevas
 
-        
+    def remove_segment(self, t_start, t_stop):
+        """
+        Elimina un segmento de la señal entre t_start y t_stop (en segundos) 
+        y ajusta las anotaciones en consecuencia.
+
+        Parámetros:
+        t_start : float
+            Tiempo de inicio del segmento a eliminar (en segundos).
+        t_stop : float
+            Tiempo de fin del segmento a eliminar (en segundos).
+
+        Retorna:
+        RawSignal
+            Nueva instancia de RawSignal con el segmento eliminado y anotaciones ajustadas.
+
+        Raises:
+        ValueError
+            Si los tiempos están fuera de rango o t_start >= t_stop.
+        """
+        if t_start >= t_stop:
+            raise ValueError("t_start debe ser menor que t_stop.")
+
+        total_duration = self.data.shape[1] / self.sfreq
+        if t_start < 0 or t_stop > total_duration:
+            raise ValueError("Intervalo fuera del rango de la señal.")
+
+        # Convertir a muestras
+        m_start = int(np.round(t_start * self.sfreq))
+        m_stop = int(np.round(t_stop * self.sfreq))
+        delta_m = m_stop - m_start
+        delta_t = t_stop - t_start
+
+        # Eliminar segmento de la señal
+        data_new = np.concatenate((self.data[:, :m_start], self.data[:, m_stop:]), axis=1)
+
+        # Ajustar anotaciones
+        nuevas_anotaciones = None
+        if self.anotaciones is not None:
+            df = self.anotaciones.anotations.copy()
+
+            # Mantener solo anotaciones que están fuera del segmento
+            df_filtrado = df[~((df["onset"] >= t_start) & (df["onset"] < t_stop))].copy()
+
+            # Ajustar anotaciones posteriores al segmento
+            df_filtrado.loc[df_filtrado["onset"] >= t_stop, "onset"] -= delta_t
+
+            nuevas_anotaciones = Anotaciones(
+                onset=df_filtrado["onset"].tolist(),
+                duration=df_filtrado["duration"].tolist(),
+                description=df_filtrado["event_id"].tolist()
+            )
+
+        # Crear nuevo objeto RawSignal
+        return RawSignal(
+            data=data_new,
+            sfreq=self.sfreq,
+            info=self.info,
+            first_samp=0,
+            anotaciones=nuevas_anotaciones
+        )
