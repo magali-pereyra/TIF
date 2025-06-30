@@ -126,4 +126,3 @@ class Info:
     def pretty(self):
         """Devuelve las claves y valores en formato de tabla bonita (pandas)."""
         return pd.DataFrame(self.__dict__.items(), columns=["Clave", "Valor"])
-

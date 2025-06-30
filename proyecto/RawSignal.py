@@ -600,10 +600,4 @@ class RawSignal:
             )
 
         # Crear nuevo objeto RawSignal
-        return RawSignal(
-            data=data_new,
-            sfreq=self.sfreq,
-            info=self.info,
-            first_samp=0,
-            anotaciones=nuevas_anotaciones
-        )
+        return RawSignal(data=data_new, sfreq=self.sfreq, info=self.info, first_samp=0, anotaciones=nuevas_anotaciones)

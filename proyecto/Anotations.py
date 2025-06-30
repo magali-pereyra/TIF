@@ -1,4 +1,5 @@
 import pandas as pd
+import os 
 class Anotaciones():
     def __init__(self, onset=None, duration=None, description=None):
         if onset and duration and description:
@@ -36,10 +37,36 @@ class Anotaciones():
         return self.anotations[self.anotations["description"]==description]
     
     def save(self,filename):
-        self.anotations.to_csv(filename,index=False)
+        # Obtener el path absoluto a la carpeta 'archivos_generados'
+        base_dir = os.path.dirname(os.path.dirname(__file__))  # Subir un nivel desde 'proyecto'
+        target_dir = os.path.join(base_dir, "archivos_generados")
+        
+        # Crear la carpeta si no existe
+        os.makedirs(target_dir, exist_ok=True)
+
+        # Construir la ruta completa al archivo
+        full_path = os.path.join(target_dir, filename)
+
+        # Guardar el archivo
+        self.anotations.to_csv(full_path, index=False)
     
-    def load(self,filename):
-        self.anotations=pd.read_csv(filename)
-    
+    def load(self, filename):
+        import os
+        import pandas as pd
+
+        # Si filename ya es una ruta absoluta, usala tal cual.
+        if not os.path.isabs(filename):
+            # Si es relativa, convertila en ruta absoluta desde este archivo.
+            base_dir = os.path.dirname(__file__)  # carpeta actual donde está la clase
+            full_path = os.path.abspath(os.path.join(base_dir, filename))
+        else:
+            full_path = filename
+
+        if not os.path.exists(full_path):
+            print(f"Archivo no encontrado en: {full_path}")
+            return
+
+        self.anotations = pd.read_csv(full_path)
+
     def __str__(self):
         return str(self.anotations)
